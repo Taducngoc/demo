@@ -1,0 +1,67 @@
+export enum UserRole {
+  STUDENT = 'STUDENT',
+  LECTURER = 'LECTURER',
+  ADMIN = 'ADMIN',
+}
+
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  PENDING = 'PENDING',
+  LOCKED = 'LOCKED',
+  REJECTED = 'REJECTED',
+}
+
+export enum CaseMode {
+  BRANCHING = 'BRANCHING',
+  REVIEW = 'REVIEW',
+}
+
+export enum CaseStatus {
+  DRAFT = 'DRAFT',
+  APPROVED = 'APPROVED',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED',
+}
+
+export enum CaseSource {
+  AI_GENERATED = 'AI_GENERATED',
+  LECTURER_AUTHORED = 'LECTURER_AUTHORED',
+}
+
+export enum NodeType {
+  CONTEXT = 'CONTEXT',
+  SITUATION = 'SITUATION',
+  TERMINAL = 'TERMINAL',
+}
+
+export enum OutcomeLabel {
+  EXCELLENT = 'Tốt',
+  ACCEPTABLE = 'Chấp nhận được',
+  POOR = 'Kém',
+}
+
+export enum AttemptStatus {
+  IN_PROGRESS = 'IN_PROGRESS',
+  REVIEWING = 'REVIEWING',
+  REFLECTING = 'REFLECTING',
+  SUBMITTED = 'SUBMITTED',
+  REVIEWED = 'REVIEWED',
+}
+
+export enum MaterialStatus {
+  UPLOADED = 'UPLOADED',
+  PROCESSING = 'PROCESSING',
+  INDEXED = 'INDEXED',
+  FAILED = 'FAILED',
+}
+
+export enum AuditAction {
+  USER_LOGIN = 'USER_LOGIN',
+  APPROVE_LECTURER = 'APPROVE_LECTURER',
+  REJECT_LECTURER = 'REJECT_LECTURER',
+  LOCK_USER = 'LOCK_USER',
+  UNLOCK_USER = 'UNLOCK_USER',
+  ARCHIVE_CASE = 'ARCHIVE_CASE',
+  UPDATE_AI_CONFIG = 'UPDATE_AI_CONFIG',
+  CHANGE_ADMIN_PASSWORD = 'CHANGE_ADMIN_PASSWORD',
+}

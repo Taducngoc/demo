@@ -1,0 +1,277 @@
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String      @id @default(uuid())
+  email           String      @unique
+  passwordHash    String
+  fullName        String
+  role            String      // STUDENT | LECTURER | ADMIN
+  status          String      // ACTIVE | PENDING | LOCKED | REJECTED
+  studentCode     String?
+  department      String?
+  rejectionReason String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  coursesLed      Course[]    @relation("LecturerCourses")
+  enrollments     Enrollment[]
+  casesAuthored   Case[]      @relation("LecturerCases")
+  attempts        Attempt[]
+  feedbacksGiven  ReviewFeedback[]
+  rubricsGiven    EvaluationRubric[]
+  surveyResponses SurveyResponse[]
+  aiCalls         AiCallLog[]
+  auditLogs       AuditLog[]  @relation("ActorAuditLogs")
+  notifications   Notification[]
+}
+
+model Course {
+  id          String       @id @default(uuid())
+  name        String
+  code        String
+  term        String
+  description String?
+  lecturerId  String
+  lecturer    User         @relation("LecturerCourses", fields: [lecturerId], references: [id])
+  classCode   String       @unique
+  createdAt   DateTime     @default(now())
+
+  enrollments Enrollment[]
+  materials   Material[]
+  cases       Case[]
+}
+
+model Enrollment {
+  id         String   @id @default(uuid())
+  courseId   String
+  course     Course   @relation(fields: [courseId], references: [id])
+  studentId  String
+  student    User     @relation(fields: [studentId], references: [id])
+  enrolledAt DateTime @default(now())
+}
+
+model Material {
+  id         String          @id @default(uuid())
+  courseId   String
+  course     Course          @relation(fields: [courseId], references: [id])
+  fileName   String
+  fileUrl    String
+  fileSize   Int
+  status     String          // UPLOADED | PROCESSING | INDEXED | FAILED
+  uploadedAt DateTime        @default(now())
+  chunks     MaterialChunk[]
+}
+
+model MaterialChunk {
+  id           String   @id @default(uuid())
+  materialId   String
+  material     Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  content      String   @db.NVarChar(Max)
+  embeddingRef String?
+}
+
+model Case {
+  id                 String       @id @default(uuid())
+  courseId           String
+  course             Course       @relation(fields: [courseId], references: [id])
+  authorId           String
+  author             User         @relation("LecturerCases", fields: [authorId], references: [id])
+  title              String
+  description        String?
+  mode               String       // BRANCHING | REVIEW
+  status             String       // DRAFT | APPROVED | PUBLISHED | ARCHIVED
+  source             String       // AI_GENERATED | LECTURER_AUTHORED
+  rootNodeId         String?
+  dueDate            DateTime?
+  version            Int          @default(1)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  reviewContext      String?      @db.NVarChar(Max)
+  reviewData         String?      @db.NVarChar(Max)
+  reviewProblem      String?      @db.NVarChar(Max)
+  analysisGuidelines String?      @db.NVarChar(Max)
+  feedbackCriteria   String?      @db.NVarChar(Max)
+
+  nodes              CaseNode[]
+  versions           CaseVersion[]
+  attempts           Attempt[]
+  rubrics            EvaluationRubric[]
+}
+
+model CaseNode {
+  id               String       @id @default(uuid())
+  caseId           String
+  case             Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  type             String       // CONTEXT | SITUATION | TERMINAL
+  title            String
+  content          String       @db.NVarChar(Max)
+  dataJson         String?      @db.NVarChar(Max)
+  promptQuestion   String?
+  isPivotal        Boolean      @default(false)
+  outcomeLabel     String?      // Tốt | Chấp nhận được | Kém
+  relatedKnowledge String?      @db.NVarChar(Max)
+  options          CaseOption[]
+  attemptSteps     AttemptStep[]
+  reasonings       Reasoning[]
+}
+
+model CaseOption {
+  id           String        @id @default(uuid())
+  nodeId       String
+  node         CaseNode      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  label        String
+  description  String        @db.NVarChar(Max)
+  nextNodeId   String
+  consequence  String        @db.NVarChar(Max)
+  attemptSteps AttemptStep[]
+}
+
+model CaseVersion {
+  id           String   @id @default(uuid())
+  caseId       String
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  snapshotJson String   @db.NVarChar(Max)
+  createdAt    DateTime @default(now())
+  createdBy    String
+}
+
+model Attempt {
+  id              String          @id @default(uuid())
+  caseId          String
+  case            Case            @relation(fields: [caseId], references: [id])
+  studentId       String
+  student         User            @relation(fields: [studentId], references: [id])
+  attemptNo       Int             @default(1)
+  status          String          // IN_PROGRESS | REVIEWING | REFLECTING | SUBMITTED | REVIEWED
+  startedAt       DateTime        @default(now())
+  finishedAt      DateTime?
+  reviewSolution  String?         @db.NVarChar(Max)
+  reviewReasoning String?         @db.NVarChar(Max)
+
+  steps           AttemptStep[]
+  reasonings      Reasoning[]
+  reflection      Reflection?
+  feedback        ReviewFeedback?
+}
+
+model AttemptStep {
+  id        String      @id @default(uuid())
+  attemptId String
+  attempt   Attempt     @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  nodeId    String
+  node      CaseNode    @relation(fields: [nodeId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  optionId  String?
+  option    CaseOption? @relation(fields: [optionId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  stepOrder Int
+  timestamp DateTime    @default(now())
+}
+
+model Reasoning {
+  id              String           @id @default(uuid())
+  attemptId       String
+  attempt         Attempt          @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  nodeId          String
+  node            CaseNode         @relation(fields: [nodeId], references: [id], onUpdate: NoAction, onDelete: NoAction)
+  content         String           @db.NVarChar(Max)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  challengeRounds ChallengeRound[]
+}
+
+model ChallengeRound {
+  id            String    @id @default(uuid())
+  reasoningId   String
+  reasoning     Reasoning @relation(fields: [reasoningId], references: [id], onDelete: Cascade)
+  roundNo       Int       // 1 or 2 (Strict maximum 2 enforced)
+  aiQuestion    String    @db.NVarChar(Max)
+  studentAnswer String?   @db.NVarChar(Max)
+  createdAt     DateTime  @default(now())
+  answeredAt    DateTime?
+}
+
+model Reflection {
+  id                     String   @id @default(uuid())
+  attemptId              String   @unique
+  attempt                Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  pivotalDecisionStep    String   @db.NVarChar(Max)
+  whatToChangeIfRetrying String   @db.NVarChar(Max)
+  keyTakeaways           String   @db.NVarChar(Max)
+  createdAt              DateTime @default(now())
+}
+
+model ReviewFeedback {
+  id             String   @id @default(uuid())
+  attemptId      String   @unique
+  attempt        Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  lecturerId     String
+  lecturer       User     @relation(fields: [lecturerId], references: [id])
+  generalComment String   @db.NVarChar(Max)
+  decisionNotes  String?  @db.NVarChar(Max)
+  createdAt      DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // INFO | DEADLINE | REVIEW | APPROVAL
+  message   String   @db.NVarChar(Max)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model EvaluationRubric {
+  id          String   @id @default(uuid())
+  caseId      String
+  case        Case     @relation(fields: [caseId], references: [id])
+  evaluatorId String
+  evaluator   User     @relation(fields: [evaluatorId], references: [id])
+  realism     Int      // 1 - 5
+  difficulty  Int      // 1 - 5
+  alignment   Int      // 1 - 5
+  comment     String   @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+}
+
+model SurveyResponse {
+  id          String   @id @default(uuid())
+  surveyId    String
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  answersJson String   @db.NVarChar(Max)
+  createdAt   DateTime @default(now())
+}
+
+model AiCallLog {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  task       String   // CASE_GENERATION | CHALLENGE_QUESTION | ANALYSIS_SUGGESTION
+  model      String
+  tokensIn   Int
+  tokensOut  Int
+  costUsd    Float
+  status     String   // SUCCESS | FAILED
+  createdAt  DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actor      User     @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  action     String
+  targetType String
+  targetId   String
+  metaJson   String?  @db.NVarChar(Max)
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+}
